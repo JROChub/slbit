@@ -1,0 +1,25 @@
+[package]
+name = "slbit"
+version = "0.1.0"
+edition = "2021"
+authors = ["MFENX LLC"]
+description = "Zero-dependency semantic transcripts and visualization metadata for human-observable proofs."
+documentation = "https://docs.rs/slbit"
+repository = "https://github.com/JROChub/slbit"
+homepage = "https://mfenx.com"
+readme = "README.md"
+license = "AGPL-3.0-only"
+keywords = ["proofs", "transcripts", "visualization", "semantics", "annotations"]
+categories = ["data-structures", "development-tools"]
+include = [
+  "Cargo.toml",
+  "LICENSE",
+  "README.md",
+  "RELEASE_NOTES.md",
+  "docs/**",
+  "src/**",
+  "examples/**",
+  "tests/**",
+]
+
+[dependencies]

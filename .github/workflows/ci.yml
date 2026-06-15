@@ -1,0 +1,27 @@
+name: slbit-ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --all-targets --locked
+      - env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps
+      - name: Zero dependency gate
+        run: |
+          test "$(cargo metadata --format-version 1 --no-deps \
+            | jq '[.packages[].dependencies[]] | length')" = "0"
+      - run: cargo package --locked
