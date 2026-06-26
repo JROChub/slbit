@@ -1,15 +1,15 @@
 [package]
 name = "slbit"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["MFENX LLC"]
-description = "Zero-dependency semantic transcripts and visualization metadata for human-observable proofs."
+description = "Zero-dependency luminous semantic packets for verifiable computation, AI traces, and proof UX."
 documentation = "https://docs.rs/slbit"
 repository = "https://github.com/JROChub/slbit"
 homepage = "https://mfenx.com"
 readme = "README.md"
 license = "AGPL-3.0-only"
-keywords = ["proofs", "transcripts", "visualization", "semantics", "annotations"]
+keywords = ["proofs", "semantics", "zkml", "agents", "visualization"]
 categories = ["data-structures", "development-tools"]
 include = [
   "Cargo.toml",

@@ -1,6 +1,6 @@
 # slbit Visualization Packet v1
 
-Status: normative for slbit v0.1.0.
+Status: normative for slbit v0.1.x and compatibility-preserved in slbit v0.2.0.
 
 The schema identifier is:
 
@@ -21,6 +21,12 @@ A packet contains:
 Packet JSON is compact UTF-8 with deterministic field ordering and JSON string
 escaping. Control characters are rejected from semantic input fields.
 
+slbit v0.2.0 emits corrected deterministic v1 JSON. The v0.1.0 implementation
+emitted a duplicate `component` key in the internal round projection used for
+packet digesting. v0.2.0 verification accepts that legacy digest form so
+existing v1 packets can still be checked, while new v1 packets use the
+corrected projection.
+
 ## Trust Boundary
 
 The packet is observation data. It MUST NOT be included in a Power House
@@ -39,3 +45,5 @@ They do not establish the soundness of an external proof.
 - opaque payload: 16 MiB per round.
 
 Round numbers MUST increase strictly.
+
+For new integrations, prefer [`packet_v2.md`](packet_v2.md).

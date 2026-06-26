@@ -6,22 +6,34 @@
 //! `slbit` is deliberately independent of proof systems. It observes and
 //! annotates proof execution without changing proof identity or validity.
 
+mod v2;
+
 use std::error::Error;
 use std::fmt;
+
+pub use v2::{
+    ExternalAnchor, LuminousPacket, LuminousPacketBuilder, LuminousSummary, MetadataField,
+    PacketDigests, Producer, RedactionRecord, SemanticEdge, SemanticGraph, SemanticNode,
+    SignatureRef,
+};
 
 /// Schema identifier for luminous metadata.
 pub const LUMINOUS_METADATA_SCHEMA_V1: &str = "slbit/luminous-metadata/v1";
 /// Schema identifier for visualization packets.
 pub const VIZ_PACKET_SCHEMA_V1: &str = "slbit/viz-packet/v1";
+/// Schema identifier for version 2 luminous visualization packets.
+pub const VIZ_PACKET_SCHEMA_V2: &str = "slbit/viz-packet/v2";
+/// Schema identifier for append-only annotation sidecars.
+pub const ANNOTATION_SIDECAR_SCHEMA_V1: &str = "slbit/annotation-sidecar/v1";
 
 const SEED_DOMAIN: &[u8] = b"slbit:transcript-seed:v1\0";
 const PAYLOAD_DOMAIN: &[u8] = b"slbit:round-payload:v1\0";
 const TRANSCRIPT_DOMAIN: &[u8] = b"slbit:transcript:v1\0";
 const PACKET_DOMAIN: &[u8] = b"slbit:viz-packet:v1\0";
-const MAX_CLAIM_ID_BYTES: usize = 256;
-const MAX_LABEL_BYTES: usize = 128;
-const MAX_NOTE_BYTES: usize = 4096;
-const MAX_ROUNDS: usize = 1_000_000;
+pub(crate) const MAX_CLAIM_ID_BYTES: usize = 256;
+pub(crate) const MAX_LABEL_BYTES: usize = 128;
+pub(crate) const MAX_NOTE_BYTES: usize = 4096;
+pub(crate) const MAX_ROUNDS: usize = 1_000_000;
 const MAX_PAYLOAD_BYTES: usize = 16 * 1024 * 1024;
 
 /// Optional presentation hints for a luminous claim.
@@ -283,10 +295,13 @@ impl VizPacket {
         }
         let expected = digest_with_domain(PACKET_DOMAIN, self.core_json().as_bytes());
         if expected != self.packet_digest {
-            return Err(SlbitError::PacketDigestMismatch {
-                expected,
-                found: self.packet_digest.clone(),
-            });
+            let legacy = digest_with_domain(PACKET_DOMAIN, self.legacy_core_json().as_bytes());
+            if legacy != self.packet_digest {
+                return Err(SlbitError::PacketDigestMismatch {
+                    expected,
+                    found: self.packet_digest.clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -295,7 +310,19 @@ impl VizPacket {
         self.packet_json(false)
     }
 
+    fn legacy_core_json(&self) -> String {
+        self.packet_json_with_round_writer(false, push_legacy_round_json)
+    }
+
     fn packet_json(&self, include_packet_digest: bool) -> String {
+        self.packet_json_with_round_writer(include_packet_digest, push_round_json)
+    }
+
+    fn packet_json_with_round_writer(
+        &self,
+        include_packet_digest: bool,
+        round_writer: fn(&mut String, &VizRound),
+    ) -> String {
         let mut json = String::from("{");
         push_json_key(&mut json, "bit_width");
         json.push_str(&self.bit_width.to_string());
@@ -314,7 +341,7 @@ impl VizPacket {
             if index > 0 {
                 json.push(',');
             }
-            push_round_json(&mut json, round);
+            round_writer(&mut json, round);
         }
         json.push(']');
         json.push(',');
@@ -388,6 +415,29 @@ pub enum SlbitError {
         /// Stored digest.
         found: String,
     },
+    /// A collection contains too many entries.
+    TooManyItems {
+        /// Field name.
+        field: &'static str,
+        /// Entry count.
+        count: usize,
+    },
+    /// An identifier appears more than once.
+    DuplicateId {
+        /// Field name.
+        field: &'static str,
+        /// Duplicated identifier.
+        id: String,
+    },
+    /// A graph edge or semantic reference points at a missing item.
+    InvalidReference {
+        /// Field name.
+        field: &'static str,
+        /// Missing reference.
+        reference: String,
+    },
+    /// A semantic graph contains a directed cycle.
+    CycleDetected,
 }
 
 impl fmt::Display for SlbitError {
@@ -421,6 +471,16 @@ impl fmt::Display for SlbitError {
                     "packet digest mismatch: expected {expected}, found {found}"
                 )
             }
+            Self::TooManyItems { field, count } => {
+                write!(formatter, "too many entries in {field}: {count}")
+            }
+            Self::DuplicateId { field, id } => {
+                write!(formatter, "duplicate identifier in {field}: {id}")
+            }
+            Self::InvalidReference { field, reference } => {
+                write!(formatter, "invalid reference in {field}: {reference}")
+            }
+            Self::CycleDetected => formatter.write_str("semantic graph contains a cycle"),
         }
     }
 }
@@ -496,7 +556,11 @@ fn validate_viz_rounds(rounds: &[VizRound]) -> Result<(), SlbitError> {
     Ok(())
 }
 
-fn validate_text(field: &'static str, value: &str, max: usize) -> Result<(), SlbitError> {
+pub(crate) fn validate_text(
+    field: &'static str,
+    value: &str,
+    max: usize,
+) -> Result<(), SlbitError> {
     if value.trim().is_empty() {
         return Err(SlbitError::InvalidText {
             field,
@@ -518,7 +582,7 @@ fn validate_text(field: &'static str, value: &str, max: usize) -> Result<(), Slb
     Ok(())
 }
 
-fn validate_sha256(value: &str) -> Result<(), SlbitError> {
+pub(crate) fn validate_sha256(value: &str) -> Result<(), SlbitError> {
     let Some(hex) = value.strip_prefix("sha256:") else {
         return Err(SlbitError::InvalidDigest(value.to_string()));
     };
@@ -544,7 +608,7 @@ fn projected_rounds(rounds: &[TranscriptRound]) -> Vec<VizRound> {
         .collect()
 }
 
-fn transcript_digest(seed_commitment: &str, rounds: &[VizRound]) -> String {
+pub(crate) fn transcript_digest(seed_commitment: &str, rounds: &[VizRound]) -> String {
     let mut bytes = Vec::new();
     absorb(&mut bytes, seed_commitment.as_bytes());
     absorb(&mut bytes, &(rounds.len() as u64).to_be_bytes());
@@ -557,17 +621,17 @@ fn transcript_digest(seed_commitment: &str, rounds: &[VizRound]) -> String {
     digest_with_domain(TRANSCRIPT_DOMAIN, &bytes)
 }
 
-fn absorb(target: &mut Vec<u8>, value: &[u8]) {
+pub(crate) fn absorb(target: &mut Vec<u8>, value: &[u8]) {
     target.extend_from_slice(&(value.len() as u64).to_be_bytes());
     target.extend_from_slice(value);
 }
 
-fn push_json_key(output: &mut String, key: &str) {
+pub(crate) fn push_json_key(output: &mut String, key: &str) {
     push_json_string(output, key);
     output.push(':');
 }
 
-fn push_json_string(output: &mut String, value: &str) {
+pub(crate) fn push_json_string(output: &mut String, value: &str) {
     output.push('"');
     for character in value.chars() {
         match character {
@@ -587,7 +651,7 @@ fn push_json_string(output: &mut String, value: &str) {
     output.push('"');
 }
 
-fn push_hints_json(output: &mut String, hints: &VizHints) {
+pub(crate) fn push_hints_json(output: &mut String, hints: &VizHints) {
     output.push('{');
     let mut wrote = false;
     if let Some(color) = hints.color {
@@ -631,7 +695,24 @@ fn push_round_json(output: &mut String, round: &VizRound) {
     output.push('}');
 }
 
-fn digest_with_domain(domain: &[u8], value: &[u8]) -> String {
+fn push_legacy_round_json(output: &mut String, round: &VizRound) {
+    output.push('{');
+    push_json_key(output, "component");
+    push_json_key(output, "component");
+    push_json_string(output, &round.component);
+    output.push(',');
+    push_json_key(output, "note");
+    push_json_string(output, &round.note);
+    output.push(',');
+    push_json_key(output, "payload_sha256");
+    push_json_string(output, &round.payload_sha256);
+    output.push(',');
+    push_json_key(output, "round");
+    output.push_str(&round.round.to_string());
+    output.push('}');
+}
+
+pub(crate) fn digest_with_domain(domain: &[u8], value: &[u8]) -> String {
     let mut bytes = Vec::with_capacity(domain.len() + value.len());
     bytes.extend_from_slice(domain);
     bytes.extend_from_slice(value);
@@ -785,6 +866,15 @@ mod tests {
             .to_json()
             .contains("Stop-sign feature strongly activated"));
         assert!(first.to_json().contains("\",\"rounds\":"));
+        assert!(!first.to_json().contains("\"component\":\"component\":"));
+    }
+
+    #[test]
+    fn legacy_v1_packet_digest_still_verifies() {
+        let mut packet = luminous().to_viz_packet().unwrap();
+        packet.packet_digest =
+            digest_with_domain(PACKET_DOMAIN, packet.legacy_core_json().as_bytes());
+        packet.verify().unwrap();
     }
 
     #[test]
