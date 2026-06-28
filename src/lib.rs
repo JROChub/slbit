@@ -7,6 +7,7 @@
 //! annotates proof execution without changing proof identity or validity.
 
 mod v2;
+mod v3;
 
 use std::error::Error;
 use std::fmt;
@@ -16,6 +17,11 @@ pub use v2::{
     PacketDigests, Producer, RedactionRecord, SemanticEdge, SemanticGraph, SemanticNode,
     SignatureRef,
 };
+pub use v3::{
+    BoundCore, ExplanationConstraints, MeaningAnswer, MeaningClaim, MeaningDag, MeaningEdge,
+    MeaningNode, MeaningPacket, MeaningPacketBuilder, MeaningRound, MeaningSupport,
+    MeaningTranscript, MeaningViews, NodeBinding,
+};
 
 /// Schema identifier for luminous metadata.
 pub const LUMINOUS_METADATA_SCHEMA_V1: &str = "slbit/luminous-metadata/v1";
@@ -23,6 +29,8 @@ pub const LUMINOUS_METADATA_SCHEMA_V1: &str = "slbit/luminous-metadata/v1";
 pub const VIZ_PACKET_SCHEMA_V1: &str = "slbit/viz-packet/v1";
 /// Schema identifier for version 2 luminous visualization packets.
 pub const VIZ_PACKET_SCHEMA_V2: &str = "slbit/viz-packet/v2";
+/// Schema identifier for version 3 Meaning Observatory packets.
+pub const VIZ_PACKET_SCHEMA_V3: &str = "slbit/viz-packet/v3";
 /// Schema identifier for append-only annotation sidecars.
 pub const ANNOTATION_SIDECAR_SCHEMA_V1: &str = "slbit/annotation-sidecar/v1";
 

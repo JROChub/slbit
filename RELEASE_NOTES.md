@@ -1,5 +1,20 @@
 # Release Notes
 
+## v3.0.0 - 2026-06-27
+
+- Added `slbit/viz-packet/v3` Meaning Observatory packets.
+- Added explicit Memory Capsule, Rootprint branch, and replay fingerprint
+  bindings.
+- Added typed semantic DAG nodes with authority labels and proof-status text.
+- Added deterministic local `MeaningPacket::ask()` for supported packet
+  questions.
+- Added non-authoritative Markdown context export for external explanation
+  tools.
+- Added v3 digest verification, semantic mutation rejection, and DAG cycle
+  rejection tests.
+- Preserved the trust boundary: v3 explains verified memory but never becomes
+  proof-system soundness or core identity.
+
 ## v0.2.0 - 2026-06-26
 
 - Added `slbit/viz-packet/v2` as the luminous semantic packet foundation.

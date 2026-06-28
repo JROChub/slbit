@@ -18,7 +18,19 @@ Changing an `slbit` packet changes the `slbit` packet digest. It must not
 change the identity of the external proof, `.pha` artifact, Rootprint graph,
 zk proof, attestation, model output, or agent action it describes.
 
-## What 0.2.0 Adds
+## What 3.0.0 Adds
+
+- `slbit/viz-packet/v3`;
+- Meaning Observatory packets for verified memory;
+- explicit Memory Capsule, branch, and replay bindings;
+- typed semantic DAG nodes with authority badges;
+- local deterministic `ask` engine;
+- structured support IDs for answers;
+- non-authoritative LLM context export;
+- digest rejection for semantic mutation;
+- cycle rejection for semantic DAGs.
+
+## What 0.2.0 Added
 
 - `slbit/viz-packet/v2`
 - stable packet IDs;
@@ -69,6 +81,32 @@ println!("{}", packet.to_markdown("operator"));
 # Ok::<(), slbit::SlbitError>(())
 ```
 
+Meaning Observatory v3:
+
+```rust
+use slbit::{BoundCore, MeaningNode, MeaningPacket};
+
+let core = BoundCore::new(
+    "phm_earth-001",
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+);
+
+let packet = MeaningPacket::builder("claim_earth_001", "EARTH-001", "proof-memory", core)
+    .node(MeaningNode::new(
+        "node_core_001",
+        "artifact",
+        "Verified core artifact",
+        "Power House core verification completed before semantic rendering.",
+    ).authority("core"))
+    .build()?;
+
+packet.verify()?;
+let answer = packet.ask("what is core truth?");
+assert!(answer.not_proven_by_this_answer);
+# Ok::<(), slbit::SlbitError>(())
+```
+
 ## v1 Compatibility
 
 The v1 API remains available:
@@ -78,13 +116,14 @@ The v1 API remains available:
 - `SimpleLuminousSumcheck`
 - `VizPacket`
 
-`slbit` 0.2.0 emits corrected deterministic v1 JSON and still accepts legacy
+`slbit` 3.0.0 emits corrected deterministic v1 JSON and still accepts legacy
 v0.1.0 packet digests during verification.
 
 ## Documentation
 
 - [`docs/packet_spec.md`](docs/packet_spec.md): v1 compatibility spec.
 - [`docs/packet_v2.md`](docs/packet_v2.md): v2 packet standard draft.
+- [`docs/packet_v3.md`](docs/packet_v3.md): v3 Meaning Observatory packet draft.
 
 ## v2 Reference Examples
 
