@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("smart-contract-invariant-proof-7", 512)
-        .producer("contract-proof-demo", "2.0.0")
+        .producer("contract-proof-demo", "3.1.0")
         .layer("invariant-check")
         .icon("database")
         .rgb(120, 170, 255)

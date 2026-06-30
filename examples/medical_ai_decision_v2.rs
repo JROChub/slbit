@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket, RedactionRecord};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("medical-triage-decision-884", 4096)
-        .producer("medical-ai-demo", "2.0.0")
+        .producer("medical-ai-demo", "3.1.0")
         .layer("triage-model")
         .icon("brain")
         .rgb(255, 113, 103)

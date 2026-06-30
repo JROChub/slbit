@@ -1,5 +1,20 @@
 # Release Notes
 
+## v3.1.0 - 2026-06-30
+
+- Added `MeaningPacket::inspect()` for deterministic truth-boundary reports.
+- Added authority counts, unbound node IDs, warning/failure node IDs, and
+  transcript node coverage reporting.
+- Added `MeaningPacket::dependency_chain()` and
+  `MeaningPacket::shortest_explanation_path()` for local semantic graph
+  inspection.
+- Expanded deterministic `MeaningPacket::ask()` with proof-boundary,
+  dependency, branch-comparison, mutation-result, and shortest-explanation
+  questions.
+- Added builder helpers for claim cards, graph views, diff views, and
+  proof-status labels.
+- Added tests for inspection, path lookup, and non-core answer boundaries.
+
 ## v3.0.0 - 2026-06-27
 
 - Added `slbit/viz-packet/v3` Meaning Observatory packets.

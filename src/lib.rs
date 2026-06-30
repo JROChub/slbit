@@ -18,9 +18,9 @@ pub use v2::{
     SignatureRef,
 };
 pub use v3::{
-    BoundCore, ExplanationConstraints, MeaningAnswer, MeaningClaim, MeaningDag, MeaningEdge,
-    MeaningNode, MeaningPacket, MeaningPacketBuilder, MeaningRound, MeaningSupport,
-    MeaningTranscript, MeaningViews, NodeBinding,
+    AuthorityCount, BoundCore, ExplanationConstraints, MeaningAnswer, MeaningBoundaryReport,
+    MeaningClaim, MeaningDag, MeaningEdge, MeaningNode, MeaningPacket, MeaningPacketBuilder,
+    MeaningRound, MeaningSupport, MeaningTranscript, MeaningViews, NodeBinding,
 };
 
 /// Schema identifier for luminous metadata.
