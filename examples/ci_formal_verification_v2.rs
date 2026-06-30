@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("ci-formal-verification-run-20260626", 1024)
-        .producer("ci-verification-demo", "2.0.0")
+        .producer("ci-verification-demo", "3.1.0")
         .layer("release-gate")
         .icon("git-branch")
         .rgb(185, 255, 61)

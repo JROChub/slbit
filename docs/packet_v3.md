@@ -1,6 +1,6 @@
 # SLBIT v3 Meaning Observatory Packet
 
-Status: draft implemented in slbit 3.0.0.
+Status: draft implemented in slbit 3.1.0.
 
 Schema:
 
@@ -43,11 +43,17 @@ UI layers must show authority. A generated or semantic answer is not proof.
 
 ```text
 what-is-this
+what-did-it-prove
 what-is-core
 what-is-semantic
+what-changed
+what-depends-on
 show-lineage
 show-replay
 show-failure-boundary
+compare-branches
+show-shortest-valid-explanation
+show-mutation-results
 export-llm-context
 ```
 
@@ -59,6 +65,31 @@ Answers include:
 - `not_proven_by_this_answer: true`.
 
 The ask engine is a packet/query engine, not an unconstrained chatbot.
+
+## Inspection Report
+
+`MeaningPacket::inspect()` verifies the packet first, then emits a
+deterministic truth-boundary report containing:
+
+- packet and core binding identifiers;
+- transcript, node, and edge counts;
+- node authority distribution;
+- unbound semantic node IDs;
+- warning and failure node IDs;
+- transcript node coverage;
+- `semantic_changes_affect_core: false`;
+- generated-text authority status.
+
+The report is for semantic inspection. It does not verify external proof
+soundness or make Rootprint, `.pha`, or Memory Capsule claims true.
+
+## Graph Inspection
+
+`MeaningPacket::dependency_chain(node_id)` returns a deterministic upstream
+semantic chain ending at `node_id`.
+
+`MeaningPacket::shortest_explanation_path(from, to)` returns the shortest
+deterministic directed semantic path between two DAG nodes.
 
 ## Digest Rule
 

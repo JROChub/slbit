@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("multi-agent-governance-vote-12", 2048)
-        .producer("governance-demo", "2.0.0")
+        .producer("governance-demo", "3.1.0")
         .layer("governance-quorum")
         .icon("database")
         .rgb(69, 221, 210)

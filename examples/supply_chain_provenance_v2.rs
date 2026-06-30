@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("supply-chain-artifact-release-19", 2048)
-        .producer("supply-chain-demo", "2.0.0")
+        .producer("supply-chain-demo", "3.1.0")
         .layer("artifact-provenance")
         .icon("database")
         .rgb(69, 221, 210)

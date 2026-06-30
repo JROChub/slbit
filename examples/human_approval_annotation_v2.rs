@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket, SignatureRef};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("human-approval-workflow-5", 256)
-        .producer("approval-demo", "2.0.0")
+        .producer("approval-demo", "3.1.0")
         .layer("approval-workflow")
         .icon("database")
         .rgb(255, 193, 77)

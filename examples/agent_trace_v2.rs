@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("agent-session-deploy-review-42", 2048)
-        .producer("agent-audit-demo", "2.0.0")
+        .producer("agent-audit-demo", "3.1.0")
         .layer("agent-session")
         .icon("robot")
         .rgb(185, 255, 61)

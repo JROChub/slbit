@@ -1,6 +1,6 @@
 [package]
 name = "slbit"
-version = "3.0.0"
+version = "3.1.0"
 edition = "2021"
 authors = ["MFENX LLC"]
 description = "Zero-dependency Meaning Observatory packets for verifiable memory, AI traces, and proof UX."

@@ -148,6 +148,12 @@ impl MeaningNode {
         self
     }
 
+    /// Sets proof-status text.
+    pub fn proof_status(mut self, proof_status: impl Into<String>) -> Self {
+        self.proof_status = proof_status.into();
+        self
+    }
+
     /// Adds a binding.
     pub fn binding(mut self, binding: NodeBinding) -> Self {
         self.bindings.push(binding);
@@ -246,6 +252,52 @@ pub struct MeaningAnswer {
     pub not_proven_by_this_answer: bool,
 }
 
+/// Deterministic inspection report for a v3 Meaning Observatory packet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeaningBoundaryReport {
+    /// Packet schema.
+    pub schema: &'static str,
+    /// Packet identifier.
+    pub packet_id: String,
+    /// Packet digest.
+    pub packet_digest: String,
+    /// Bound Memory Capsule identifier.
+    pub capsule_id: String,
+    /// Bound Rootprint branch identifier.
+    pub branch_id: String,
+    /// Bound replay fingerprint.
+    pub replay_fingerprint: String,
+    /// Number of semantic transcript rounds.
+    pub transcript_rounds: usize,
+    /// Number of semantic DAG nodes.
+    pub semantic_nodes: usize,
+    /// Number of semantic DAG edges.
+    pub semantic_edges: usize,
+    /// Authority distribution across DAG nodes.
+    pub authority_counts: Vec<AuthorityCount>,
+    /// Semantic nodes without an explicit binding.
+    pub unbound_node_ids: Vec<String>,
+    /// Warning node identifiers.
+    pub warning_node_ids: Vec<String>,
+    /// Failure node identifiers.
+    pub failure_node_ids: Vec<String>,
+    /// Whether every transcript round references a DAG node.
+    pub transcript_nodes_resolved: bool,
+    /// Whether semantic changes can affect external proof identity.
+    pub semantic_changes_affect_core: bool,
+    /// Whether generated text is marked as non-authoritative.
+    pub generated_text_is_non_authoritative: bool,
+}
+
+/// Count of semantic DAG nodes by authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthorityCount {
+    /// Authority name.
+    pub authority: String,
+    /// Number of nodes with this authority.
+    pub count: usize,
+}
+
 /// SLBIT v3 Meaning Observatory packet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MeaningPacket {
@@ -299,6 +351,151 @@ impl MeaningPacket {
         Ok(())
     }
 
+    /// Produces a deterministic truth-boundary inspection report.
+    ///
+    /// This verifies the packet first. The report describes semantic packet
+    /// integrity and binding shape only; it does not verify external proof
+    /// soundness, Power House `.pha` identity, Rootprint lineage, or replay.
+    pub fn inspect(&self) -> Result<MeaningBoundaryReport, SlbitError> {
+        self.verify()?;
+        let node_ids = self
+            .semantic_dag
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect::<BTreeSet<_>>();
+        let mut authority_counts = BTreeMap::<String, usize>::new();
+        let mut unbound_node_ids = Vec::new();
+        let mut warning_node_ids = Vec::new();
+        let mut failure_node_ids = Vec::new();
+        for node in sorted_nodes(&self.semantic_dag.nodes) {
+            *authority_counts.entry(node.authority.clone()).or_default() += 1;
+            if node.bindings.is_empty() {
+                unbound_node_ids.push(node.id.clone());
+            }
+            if node.node_type == "warning" {
+                warning_node_ids.push(node.id.clone());
+            }
+            if node.node_type == "failure" {
+                failure_node_ids.push(node.id.clone());
+            }
+        }
+        let transcript_nodes_resolved = self
+            .transcript
+            .rounds
+            .iter()
+            .all(|round| node_ids.contains(round.node_id.as_str()));
+        Ok(MeaningBoundaryReport {
+            schema: self.schema,
+            packet_id: self.packet_id.clone(),
+            packet_digest: self.packet_digest.clone(),
+            capsule_id: self.claim.bound_core.capsule_id.clone(),
+            branch_id: self.claim.bound_core.branch_id.clone(),
+            replay_fingerprint: self.claim.bound_core.replay_fingerprint.clone(),
+            transcript_rounds: self.transcript.rounds.len(),
+            semantic_nodes: self.semantic_dag.nodes.len(),
+            semantic_edges: self.semantic_dag.edges.len(),
+            authority_counts: authority_counts
+                .into_iter()
+                .map(|(authority, count)| AuthorityCount { authority, count })
+                .collect(),
+            unbound_node_ids,
+            warning_node_ids,
+            failure_node_ids,
+            transcript_nodes_resolved,
+            semantic_changes_affect_core: false,
+            generated_text_is_non_authoritative: self
+                .explanation_constraints
+                .mark_generated_text_non_authoritative,
+        })
+    }
+
+    /// Returns deterministic upstream dependencies for a semantic DAG node.
+    ///
+    /// The returned list is ordered from earliest dependency toward `node_id`
+    /// and includes `node_id` as the final element.
+    pub fn dependency_chain(&self, node_id: &str) -> Result<Vec<String>, SlbitError> {
+        self.verify()?;
+        let ids = self.node_id_set();
+        if !ids.contains(node_id) {
+            return Err(SlbitError::InvalidReference {
+                field: "semantic_dag.node.id",
+                reference: node_id.to_string(),
+            });
+        }
+        let mut reverse = BTreeMap::<String, Vec<String>>::new();
+        for edge in &self.semantic_dag.edges {
+            reverse
+                .entry(edge.to.clone())
+                .or_default()
+                .push(edge.from.clone());
+        }
+        for parents in reverse.values_mut() {
+            parents.sort();
+        }
+        let mut visited = BTreeSet::new();
+        let mut ordered = Vec::new();
+        collect_dependencies(node_id, &reverse, &mut visited, &mut ordered);
+        Ok(ordered)
+    }
+
+    /// Finds the shortest deterministic semantic path between two DAG nodes.
+    pub fn shortest_explanation_path(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<Vec<String>, SlbitError> {
+        self.verify()?;
+        let ids = self.node_id_set();
+        for id in [from, to] {
+            if !ids.contains(id) {
+                return Err(SlbitError::InvalidReference {
+                    field: "semantic_dag.node.id",
+                    reference: id.to_string(),
+                });
+            }
+        }
+        if from == to {
+            return Ok(vec![from.to_string()]);
+        }
+        let mut adjacency = BTreeMap::<String, Vec<String>>::new();
+        for edge in &self.semantic_dag.edges {
+            adjacency
+                .entry(edge.from.clone())
+                .or_default()
+                .push(edge.to.clone());
+        }
+        for children in adjacency.values_mut() {
+            children.sort();
+        }
+        let mut queue = vec![vec![from.to_string()]];
+        let mut seen = BTreeSet::from([from.to_string()]);
+        let mut index = 0;
+        while let Some(path) = queue.get(index).cloned() {
+            index += 1;
+            let Some(last) = path.last() else {
+                continue;
+            };
+            if let Some(children) = adjacency.get(last) {
+                for child in children {
+                    if !seen.insert(child.clone()) {
+                        continue;
+                    }
+                    let mut next = path.clone();
+                    next.push(child.clone());
+                    if child == to {
+                        return Ok(next);
+                    }
+                    queue.push(next);
+                }
+            }
+        }
+        Err(SlbitError::InvalidReference {
+            field: "semantic_dag.path",
+            reference: format!("{from}->{to}"),
+        })
+    }
+
     /// Deterministic local query engine.
     pub fn ask(&self, question: &str) -> MeaningAnswer {
         let normalized = normalize_question(question);
@@ -309,6 +506,15 @@ impl MeaningPacket {
                     self.claim.label, self.claim.domain
                 ),
                 vec![support("claim", &self.claim.claim_id)],
+            ),
+            "what-did-it-prove" | "what-does-it-prove" => self.answer(
+                "SLBIT verifies semantic packet integrity and digest consistency. External proof validity remains the authority of the bound proof system."
+                    .to_string(),
+                vec![
+                    support("packet_digest", &self.packet_digest),
+                    support("branch", &self.claim.bound_core.branch_id),
+                    support("replay_fingerprint", &self.claim.bound_core.replay_fingerprint),
+                ],
             ),
             "what-is-core" | "what-is-core-truth" => self.answer(
                 "Core truth is the bound Memory Capsule, Rootprint branch, and replay fingerprint referenced by this packet."
@@ -327,6 +533,52 @@ impl MeaningPacket {
                     .map(|node| support("node", &node.id))
                     .collect(),
             ),
+            "what-changed" => {
+                let mut support_items = self
+                    .semantic_dag
+                    .nodes
+                    .iter()
+                    .filter(|node| {
+                        matches!(
+                            node.node_type.as_str(),
+                            "warning" | "failure" | "merge" | "fork"
+                        )
+                    })
+                    .map(|node| support("node", &node.id))
+                    .collect::<Vec<_>>();
+                if support_items.is_empty() {
+                    support_items.push(support("packet_digest", &self.packet_digest));
+                }
+                self.answer(
+                    "Changes are represented by explicit semantic DAG nodes such as fork, merge, warning, or failure nodes; packet digest changes reveal semantic mutation."
+                        .to_string(),
+                    support_items,
+                )
+            }
+            "what-depends-on" | "what-depends-on-this" => {
+                let target = self
+                    .views
+                    .timeline
+                    .last()
+                    .or_else(|| self.semantic_dag.nodes.last().map(|node| &node.id));
+                match target {
+                    Some(target) => match self.dependency_chain(target) {
+                        Ok(chain) => self.answer(
+                            format!("Semantic node {target} depends on {} DAG node(s).", chain.len()),
+                            chain.iter().map(|id| support("node", id)).collect(),
+                        ),
+                        Err(_) => self.answer(
+                            "No deterministic dependency chain is available for this packet."
+                                .to_string(),
+                            Vec::new(),
+                        ),
+                    },
+                    None => self.answer(
+                        "This packet has no semantic DAG nodes to inspect.".to_string(),
+                        Vec::new(),
+                    ),
+                }
+            }
             "show-lineage" | "show-replay" => self.answer(
                 format!(
                     "Replay is bound to {} on branch {}.",
@@ -339,6 +591,66 @@ impl MeaningPacket {
                     .to_string(),
                 vec![support("packet_digest", &self.packet_digest)],
             ),
+            "show-shortest-valid-explanation" => {
+                let start = self
+                    .views
+                    .timeline
+                    .first()
+                    .or_else(|| self.semantic_dag.nodes.first().map(|node| &node.id));
+                let end = self
+                    .views
+                    .timeline
+                    .last()
+                    .or_else(|| self.semantic_dag.nodes.last().map(|node| &node.id));
+                match (start, end) {
+                    (Some(start), Some(end)) => match self.shortest_explanation_path(start, end) {
+                        Ok(path) => self.answer(
+                            format!("Shortest semantic explanation path has {} node(s).", path.len()),
+                            path.iter().map(|id| support("node", id)).collect(),
+                        ),
+                        Err(_) => self.answer(
+                            "No connected semantic explanation path exists between the selected packet nodes."
+                                .to_string(),
+                            Vec::new(),
+                        ),
+                    },
+                    _ => self.answer(
+                        "This packet has no semantic nodes to explain.".to_string(),
+                        Vec::new(),
+                    ),
+                }
+            }
+            "show-mutation-results" => {
+                let failures = self
+                    .semantic_dag
+                    .nodes
+                    .iter()
+                    .filter(|node| node.node_type == "failure")
+                    .map(|node| support("node", &node.id))
+                    .collect::<Vec<_>>();
+                self.answer(
+                    if failures.is_empty() {
+                        "No mutation or failure nodes are declared in this packet.".to_string()
+                    } else {
+                        format!("This packet declares {} mutation/failure node(s).", failures.len())
+                    },
+                    failures,
+                )
+            }
+            "compare-branches" => {
+                let branch_support = self
+                    .semantic_dag
+                    .nodes
+                    .iter()
+                    .filter(|node| matches!(node.node_type.as_str(), "branch" | "fork" | "merge"))
+                    .map(|node| support("node", &node.id))
+                    .collect::<Vec<_>>();
+                self.answer(
+                    "Branch comparison is represented by branch, fork, and merge nodes in the semantic DAG; external Rootprint equivalence remains outside SLBIT authority."
+                        .to_string(),
+                    branch_support,
+                )
+            }
             "export-llm-context" => self.answer(
                 self.to_markdown_context(),
                 self.semantic_dag
@@ -348,7 +660,7 @@ impl MeaningPacket {
                     .collect(),
             ),
             _ => self.answer(
-                "Unsupported deterministic question. Supported questions include what-is-this, what-is-core, what-is-semantic, show-lineage, show-replay, show-failure-boundary, and export-llm-context."
+                "Unsupported deterministic question. Supported questions include what-is-this, what-did-it-prove, what-is-core, what-is-semantic, what-changed, what-depends-on, show-lineage, show-replay, show-failure-boundary, compare-branches, show-shortest-valid-explanation, show-mutation-results, and export-llm-context."
                     .to_string(),
                 Vec::new(),
             ),
@@ -376,10 +688,14 @@ impl MeaningPacket {
         output.push_str("## Nodes\n\n");
         for node in &self.semantic_dag.nodes {
             output.push_str(&format!(
-                "- `{}` `{}`: {}\n",
-                node.id, node.authority, node.label
+                "- `{}` `{}` `{}`: {}\n",
+                node.id, node.node_type, node.authority, node.label
             ));
         }
+        output.push_str("\n## Truth Boundary\n\n");
+        output.push_str(
+            "SLBIT validates semantic packet integrity. It does not make external proof claims true.\n",
+        );
         output
     }
 
@@ -394,6 +710,14 @@ impl MeaningPacket {
 
     fn core_json(&self) -> String {
         self.packet_json(false)
+    }
+
+    fn node_id_set(&self) -> BTreeSet<&str> {
+        self.semantic_dag
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect()
     }
 
     fn packet_json(&self, include_digest: bool) -> String {
@@ -516,6 +840,24 @@ impl MeaningPacketBuilder {
     /// Adds a timeline node reference.
     pub fn timeline(mut self, node_id: impl Into<String>) -> Self {
         self.views.timeline.push(node_id.into());
+        self
+    }
+
+    /// Adds a claim-card node reference.
+    pub fn claim_card(mut self, node_id: impl Into<String>) -> Self {
+        self.views.claim_cards.push(node_id.into());
+        self
+    }
+
+    /// Adds a graph view name.
+    pub fn graph_view(mut self, name: impl Into<String>) -> Self {
+        self.views.graphs.push(name.into());
+        self
+    }
+
+    /// Adds a diff view name.
+    pub fn diff_view(mut self, name: impl Into<String>) -> Self {
+        self.views.diffs.push(name.into());
         self
     }
 
@@ -810,6 +1152,23 @@ fn support(kind: &str, id: &str) -> MeaningSupport {
         kind: kind.to_string(),
         id: id.to_string(),
     }
+}
+
+fn collect_dependencies(
+    node: &str,
+    reverse: &BTreeMap<String, Vec<String>>,
+    visited: &mut BTreeSet<String>,
+    ordered: &mut Vec<String>,
+) {
+    if !visited.insert(node.to_string()) {
+        return;
+    }
+    if let Some(parents) = reverse.get(node) {
+        for parent in parents {
+            collect_dependencies(parent, reverse, visited, ordered);
+        }
+    }
+    ordered.push(node.to_string());
 }
 
 fn push_claim_json(out: &mut String, claim: &MeaningClaim) {

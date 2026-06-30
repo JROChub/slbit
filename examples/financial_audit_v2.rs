@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket, RedactionRecord};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("risk-model-audit-2026-06", 1024)
-        .producer("risk-audit-demo", "2.0.0")
+        .producer("risk-audit-demo", "3.1.0")
         .layer("credit-risk-model")
         .icon("database")
         .rgb(255, 193, 77)

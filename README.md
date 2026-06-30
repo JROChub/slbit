@@ -18,7 +18,18 @@ Changing an `slbit` packet changes the `slbit` packet digest. It must not
 change the identity of the external proof, `.pha` artifact, Rootprint graph,
 zk proof, attestation, model output, or agent action it describes.
 
-## What 3.0.0 Adds
+## What 3.1.0 Adds
+
+- deterministic v3 truth-boundary inspection reports;
+- authority counts, unbound node listing, warning/failure node listing, and
+  transcript node coverage;
+- deterministic semantic dependency-chain and shortest-path inspection;
+- richer local `ask` questions for proof boundary, branch comparison,
+  dependency review, mutation/failure nodes, and shortest explanation paths;
+- builder helpers for claim cards, graph views, diff views, and proof-status
+  labels.
+
+## What 3.0.0 Added
 
 - `slbit/viz-packet/v3`;
 - Meaning Observatory packets for verified memory;
@@ -54,7 +65,7 @@ The crate still has no normal, build, or development dependencies.
 use slbit::LuminousPacket;
 
 let packet = LuminousPacket::builder("drone-camera-frame-7842", 4096)
-    .producer("drone-perception-demo", "2.0.0")
+    .producer("drone-perception-demo", "3.1.0")
     .layer("perception-conv3")
     .icon("camera")
     .rgb(0, 200, 255)
@@ -102,6 +113,8 @@ let packet = MeaningPacket::builder("claim_earth_001", "EARTH-001", "proof-memor
     .build()?;
 
 packet.verify()?;
+let report = packet.inspect()?;
+assert!(!report.semantic_changes_affect_core);
 let answer = packet.ask("what is core truth?");
 assert!(answer.not_proven_by_this_answer);
 # Ok::<(), slbit::SlbitError>(())
@@ -116,7 +129,7 @@ The v1 API remains available:
 - `SimpleLuminousSumcheck`
 - `VizPacket`
 
-`slbit` 3.0.0 emits corrected deterministic v1 JSON and still accepts legacy
+`slbit` 3.1.0 emits corrected deterministic v1 JSON and still accepts legacy
 v0.1.0 packet digests during verification.
 
 ## Documentation

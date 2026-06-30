@@ -27,7 +27,7 @@ fn guide_api_compiles_and_verifies() {
 #[test]
 fn v2_builder_creates_verified_rootprint_linked_packet() {
     let packet = LuminousPacket::builder("drone-camera-frame-7842", 4096)
-        .producer("drone-perception-demo", "2.0.0")
+        .producer("drone-perception-demo", "3.1.0")
         .environment("testnet")
         .seed(b"drone-seed-7842")
         .layer("perception-conv3")

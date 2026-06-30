@@ -2,7 +2,7 @@ use slbit::{ExternalAnchor, LuminousPacket};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packet = LuminousPacket::builder("zkml-image-classification-17", 8192)
-        .producer("zkml-demo", "2.0.0")
+        .producer("zkml-demo", "3.1.0")
         .layer("classifier-transformer")
         .icon("brain")
         .rgb(130, 180, 255)
