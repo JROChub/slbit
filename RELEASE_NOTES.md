@@ -1,5 +1,11 @@
 # Release Notes
 
+## v3.1.2 - 2026-10-18
+
+Documentation revision: define packet integrity, external verification, and
+producer-supplied authority explicitly; document traversal behavior and the
+limits of the recorded measurements. No implementation or format changes.
+
 ## v3.1.1 - 2026-10-18
 
 - Replaced recursive v2/v3 cycle detection and v3 dependency traversal with
