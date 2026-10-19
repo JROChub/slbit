@@ -21,8 +21,9 @@ authority labels and may refer to external evidence. These labels are
 assertions made by the packet producer; assigning `core` authority does not
 authenticate the referenced object. Serialization is deterministic, and packet
 verification rejects malformed structure, cyclic dependencies, and digest
-mismatches. An annotation change therefore changes packet identity while
-leaving the external computation's identity unchanged.
+mismatches. An annotation change therefore changes the packet digest while leaving
+the external computation's identity unchanged. The stable `packet_id` is
+derived separately from the claim ID, branch ID, and replay fingerprint.
 
 ```toml
 [dependencies]
@@ -63,9 +64,10 @@ fn describe_replay(core: BoundCore) -> Result<MeaningPacket, SlbitError> {
 unbound nodes, and transcript coverage. `dependency_chain()` returns a
 deterministic upstream ordering; `shortest_explanation_path()` returns a
 shortest directed path with deterministic tie-breaking. The `ask()` interface
-maps supported questions to local packet queries. Its answers include support
-identifiers and explicitly carry no proof authority; no language model or
-remote service participates in the query.
+maps supported questions to local packet queries. Its answers carry support identifiers when available and explicitly carry
+no proof authority. Most question handlers do not verify packet integrity; call
+`verify()` or `inspect()` before treating their support identifiers as checked
+packet data. No language model or remote service participates in the query.
 
 Graph validation and dependency traversal use explicit heap storage, so call
 stack usage does not grow with graph depth. Shortest-path search retains one
