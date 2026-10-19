@@ -6,6 +6,7 @@
 //! `slbit` is deliberately independent of proof systems. It observes and
 //! annotates proof execution without changing proof identity or validity.
 
+mod graph;
 mod v2;
 mod v3;
 

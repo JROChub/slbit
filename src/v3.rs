@@ -1,10 +1,11 @@
 //! Version 3 Meaning Observatory packets.
 
+use crate::graph::reject_cycles;
 use crate::{
     digest_with_domain, push_json_key, push_json_string, validate_sha256, validate_text,
     SlbitError, MAX_LABEL_BYTES, MAX_NOTE_BYTES, MAX_ROUNDS, VIZ_PACKET_SCHEMA_V3,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
 const PACKET_DOMAIN_V3: &[u8] = b"SLBIT-PACKET-v3\0";
@@ -468,25 +469,26 @@ impl MeaningPacket {
         for children in adjacency.values_mut() {
             children.sort();
         }
-        let mut queue = vec![vec![from.to_string()]];
-        let mut seen = BTreeSet::from([from.to_string()]);
-        let mut index = 0;
-        while let Some(path) = queue.get(index).cloned() {
-            index += 1;
-            let Some(last) = path.last() else {
-                continue;
-            };
+        let mut queue = VecDeque::from([from]);
+        let mut predecessor = BTreeMap::from([(from, None)]);
+        while let Some(last) = queue.pop_front() {
             if let Some(children) = adjacency.get(last) {
                 for child in children {
-                    if !seen.insert(child.clone()) {
+                    if predecessor.contains_key(child.as_str()) {
                         continue;
                     }
-                    let mut next = path.clone();
-                    next.push(child.clone());
+                    predecessor.insert(child.as_str(), Some(last));
                     if child == to {
-                        return Ok(next);
+                        let mut path = Vec::new();
+                        let mut cursor = Some(child.as_str());
+                        while let Some(node) = cursor {
+                            path.push(node.to_string());
+                            cursor = predecessor[node];
+                        }
+                        path.reverse();
+                        return Ok(path);
                     }
-                    queue.push(next);
+                    queue.push_back(child);
                 }
             }
         }
@@ -1027,40 +1029,6 @@ fn validate_dag_v3(dag: &MeaningDag) -> Result<(), SlbitError> {
     reject_cycles(&ids, &adjacency)
 }
 
-fn reject_cycles(
-    ids: &BTreeSet<String>,
-    adjacency: &BTreeMap<String, Vec<String>>,
-) -> Result<(), SlbitError> {
-    fn visit(
-        node: &str,
-        adjacency: &BTreeMap<String, Vec<String>>,
-        temporary: &mut BTreeSet<String>,
-        permanent: &mut BTreeSet<String>,
-    ) -> Result<(), SlbitError> {
-        if permanent.contains(node) {
-            return Ok(());
-        }
-        if !temporary.insert(node.to_string()) {
-            return Err(SlbitError::CycleDetected);
-        }
-        if let Some(children) = adjacency.get(node) {
-            for child in children {
-                visit(child, adjacency, temporary, permanent)?;
-            }
-        }
-        temporary.remove(node);
-        permanent.insert(node.to_string());
-        Ok(())
-    }
-
-    let mut temporary = BTreeSet::new();
-    let mut permanent = BTreeSet::new();
-    for id in ids {
-        visit(id, adjacency, &mut temporary, &mut permanent)?;
-    }
-    Ok(())
-}
-
 fn validate_views(views: &MeaningViews, dag: &MeaningDag) -> Result<(), SlbitError> {
     let ids = dag
         .nodes
@@ -1160,15 +1128,18 @@ fn collect_dependencies(
     visited: &mut BTreeSet<String>,
     ordered: &mut Vec<String>,
 ) {
-    if !visited.insert(node.to_string()) {
-        return;
-    }
-    if let Some(parents) = reverse.get(node) {
-        for parent in parents {
-            collect_dependencies(parent, reverse, visited, ordered);
+    let mut stack = vec![(node, false)];
+    while let Some((current, expanded)) = stack.pop() {
+        if expanded {
+            ordered.push(current.to_string());
+        } else if visited.insert(current.to_string()) {
+            stack.push((current, true));
+            if let Some(parents) = reverse.get(current) {
+                // Reverse pushes preserve the existing lexical DFS postorder.
+                stack.extend(parents.iter().rev().map(|parent| (parent.as_str(), false)));
+            }
         }
     }
-    ordered.push(node.to_string());
 }
 
 fn push_claim_json(out: &mut String, claim: &MeaningClaim) {

@@ -1,5 +1,17 @@
 # Release Notes
 
+## v3.1.1 - 2026-10-18
+
+- Replaced recursive v2/v3 cycle detection and v3 dependency traversal with
+  iterative algorithms. Valid deep packets no longer consume stack space
+  proportional to graph depth.
+- Replaced whole-path BFS copies with a predecessor map. Shortest-path storage
+  is proportional to graph size, while lexical tie-breaking is unchanged.
+- Preserved packet schemas, digest projections, dependency order, and the
+  boundary between semantic integrity and external proof validity.
+- Added a small-stack 10,000-node regression, diamond/permutation checks, and a
+  reproducible release-mode benchmark supporting the 100,000-node limit.
+
 ## v3.1.0 - 2026-06-30
 
 - Added `MeaningPacket::inspect()` for deterministic truth-boundary reports.

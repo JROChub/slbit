@@ -1,5 +1,6 @@
 //! Version 2 luminous packet structures.
 
+use crate::graph::reject_cycles;
 use crate::{
     absorb, digest_with_domain, push_hints_json, push_json_key, push_json_string, validate_sha256,
     validate_text, LuminousClaim, SlbitError, VizHints, VizRound, MAX_CLAIM_ID_BYTES,
@@ -956,40 +957,6 @@ fn validate_graph(graph: &SemanticGraph) -> Result<(), SlbitError> {
             .push(edge.to.clone());
     }
     reject_cycles(&ids, &adjacency)
-}
-
-fn reject_cycles(
-    ids: &BTreeSet<String>,
-    adjacency: &BTreeMap<String, Vec<String>>,
-) -> Result<(), SlbitError> {
-    fn visit(
-        node: &str,
-        adjacency: &BTreeMap<String, Vec<String>>,
-        temporary: &mut BTreeSet<String>,
-        permanent: &mut BTreeSet<String>,
-    ) -> Result<(), SlbitError> {
-        if permanent.contains(node) {
-            return Ok(());
-        }
-        if !temporary.insert(node.to_string()) {
-            return Err(SlbitError::CycleDetected);
-        }
-        if let Some(children) = adjacency.get(node) {
-            for child in children {
-                visit(child, adjacency, temporary, permanent)?;
-            }
-        }
-        temporary.remove(node);
-        permanent.insert(node.to_string());
-        Ok(())
-    }
-
-    let mut temporary = BTreeSet::new();
-    let mut permanent = BTreeSet::new();
-    for id in ids {
-        visit(id, adjacency, &mut temporary, &mut permanent)?;
-    }
-    Ok(())
 }
 
 fn validate_summaries(summaries: &[LuminousSummary]) -> Result<(), SlbitError> {
