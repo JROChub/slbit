@@ -18,7 +18,19 @@ Changing an `slbit` packet changes the `slbit` packet digest. It must not
 change the identity of the external proof, `.pha` artifact, Rootprint graph,
 zk proof, attestation, model output, or agent action it describes.
 
-## What 3.1.0 Adds
+## What 3.1.1 Adds
+
+Deep v2/v3 graphs use iterative validation. V3 dependency traversal no longer
+recurses, and shortest-path search stores predecessors instead of copying every
+partial path. Packet identity and deterministic query ordering are unchanged.
+The crate still has zero dependencies.
+
+Reproduce graph traversal timings with
+`cargo run --release --example meaning_graph_benchmark -- 2048` (or `100000`).
+The benchmark checks that shortest-path and dependency results agree and emits
+the packet digest alongside timings. Performance depends on the host and graph.
+
+## What 3.1.0 Added
 
 - deterministic v3 truth-boundary inspection reports;
 - authority counts, unbound node listing, warning/failure node listing, and

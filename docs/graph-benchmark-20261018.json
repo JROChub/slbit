@@ -1,0 +1,31 @@
+{
+  "schema": "slbit/graph-benchmark/v1",
+  "baseline_commit": "4024c82198df685fbeede18ece2041de7519978c",
+  "compiler": "rustc 1.93.1",
+  "profile": "release",
+  "comparison": "same host, same 2048-node chain, one observed run per implementation; includes full packet verification",
+  "baseline": {
+    "nodes": 2048,
+    "build_us": 29304,
+    "path_us": 426244,
+    "dependency_us": 14390,
+    "packet_digest": "sha256:2476650452d401486186493387df43aa8f9b143b55cc4f6ecb153112b8361007",
+    "max_rss_kib": 127244
+  },
+  "iterative": {
+    "nodes": 2048,
+    "build_us": 18148,
+    "path_us": 12399,
+    "dependency_us": 11588,
+    "packet_digest": "sha256:2476650452d401486186493387df43aa8f9b143b55cc4f6ecb153112b8361007",
+    "max_rss_kib": 12944
+  },
+  "limit_run": {
+    "nodes": 100000,
+    "build_us": 1165336,
+    "path_us": 709704,
+    "dependency_us": 721043,
+    "packet_digest": "sha256:800af1b715110e55a155c851788aca788557e68078657118178ab131129d26df",
+    "max_rss_kib": 194032
+  }
+}
